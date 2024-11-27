@@ -1,0 +1,13 @@
+[project]
+name = "infnerf"
+version = "0.1.0"
+
+dependencies = [
+    "nerfstudio" # you may want to consider pinning the version, ie "nerfstudio==0.1.19"
+]
+
+[tool.setuptools.packages.find]
+include = ["infnerf*"]
+
+[project.entry-points.'nerfstudio.method_configs']
+inf-nerf = 'infnerf.inf_nerf_config:InfNerf'

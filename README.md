@@ -9,7 +9,7 @@
 <sup>3</sup> [Xi'an Jiaotong University](https://www.xjtu.edu.cn/)
 
 ## Overview
-Here is the reposity of InfNeRF. Code and checkpoints are coming soon.
+Major part of InfNeRF source code. Ready to read, study and reproduce. Some other parts like data parser are still under reconstruction. 
 
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
