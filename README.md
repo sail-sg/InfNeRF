@@ -1,4 +1,4 @@
-# InfNeRF: Towards Infinite Scale NeRF Rendering with O(log n) Space Complexity
+# InfNeRF: Towards Infinite Scale NeRF Rendering with O(log n) Space Complexity (Siggraph Asia 2024)
 
 | [Project Page](https://jiabinliang.github.io/InfNeRF.io/) | [Paper](https://dl.acm.org/doi/pdf/10.1145/3680528.3687646) |<br>
 
