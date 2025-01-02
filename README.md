@@ -20,35 +20,24 @@ This strategy allows for parallel training with minimal overhead, ensuring the s
 ## Demo
 Result of Window of the World, ShenZhen, rendering with < 17% of the model:
 
-<video  controls>
-  <source src="https://jiabinliang.github.io/InfNeRF.io/video/winworld_720.mp4" type="video/mp4">
-</video>
-
-<br>
+<video src="./img/winworld_720.mp4" controls></video>
 
 Result of UrbanScene3D Residence, rendering with < 16% of the model:
 
-<video  controls>
-  <source src="https://jiabinliang.github.io/InfNeRF.io/video/residence_720.mp4" type="video/mp4">
-</video>
+<video src="./img/residence_720.mp4" controls></video>
+
 
 Result of UrbanScene3D Sci Art:
 
-<video  controls>
-  <source src=https://jiabinliang.github.io/InfNeRF.io/video/sci_720.mp4 type="video/mp4">
-</video>
+<video src="./img/sci_720.mp4" controls></video>
 
 Result of Mill 19 Building:
 
-<video  controls>
-  <source src="https://jiabinliang.github.io/InfNeRF.io/video/building_720.mp4" type="video/mp4">
-</video>
+<video src="./img/building_720.mp4" controls></video>
 
 Result of Mill 19 Rubble:
 
-<video  controls>
-  <source src="https://jiabinliang.github.io/InfNeRF.io/video/rubble_720.mp4" type="video/mp4">
-</video>
+<video src="./img/rubble_720.mp4" controls></video>
 
 ## Data Preparation
 
@@ -58,12 +47,10 @@ Result of Mill 19 Rubble:
 - The Rubble scene can be downloaded [here](https://storage.cmusatyalab.org/mega-nerf-data/rubble-pixsfm.tgz).
 
 ### UrbanScene 3D
-
-1. Download the raw photo collections from the [UrbanScene3D](https://vcc.tech/UrbanScene3D/) dataset
-2. Download the refined camera poses for one of the scenes below:
-  - [Residence](https://storage.cmusatyalab.org/mega-nerf-data/residence-pixsfm.tgz)
-  - [Sci-Art](https://storage.cmusatyalab.org/mega-nerf-data/sci-art-pixsfm.tgz)
-  - [Campus](https://storage.cmusatyalab.org/mega-nerf-data/campus-pixsfm.tgz)
+Download the raw photo collections from the [UrbanScene3D](https://github.com/Linxius/UrbanScene3D?tab=readme-ov-file#urbanscene3d-v1) dataset
+  - [Residence](http://szuvccnas.quickconnect.cn/d/s/lSvWkTMbFjecrEwZDx3cV72M5scS2tKA/OxnMJCCChFCGAqEHfVC09VJmO_f-qrga-_LFAaeS27Ag)
+  - [Sci-Art](http://szuvccnas.quickconnect.cn/d/s/lT61obCnx48mOc1FrPtUiuZ8eNCOrEQd/27C8eKMNd1YBpLxJTbYY-jMWU7vRHhbs-5bHAJ9227Ag)
+  - [Campus](http://szuvccnas.quickconnect.cn/d/s/lRrBh8QyqmVQnXgn6Lc41vqnpeZej5bm/Xj3MGE2nOmr9CR_q09lJzYzmtcUGc5XQ-67Hgr9-27Ag)
 
 After downloading all the raw images, use COLMAP to obtain the camera poses:
 
