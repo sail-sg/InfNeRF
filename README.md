@@ -19,19 +19,26 @@ This strategy allows for parallel training with minimal overhead, ensuring the s
 
 ## Demo
 Result of Window of the World, ShenZhen, rendering with < 17% of the model:
+
 ![winworld](./img/winworld_720.gif)
 
 Result of UrbanScene3D Residence, rendering with < 16% of the model:
+
 ![residence](./img/residence_720.gif)
 
 Result of UrbanScene3D Sci Art:
+
 ![residence](./img/sci_720.gif)
 
 Result of Mill 19 Building:
+
 ![residence](./img/building_720.gif)
 
 Result of Mill 19 Rubble:
+
 ![residence](./img/rubble_720.gif)
+
+Refer to our [project page](https://jiabinliang.github.io/InfNeRF.io/) for more high-resolution rendering results.
 
 ## Data Preparation
 
