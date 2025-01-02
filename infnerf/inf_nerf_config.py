@@ -66,7 +66,7 @@ InfNerf=MethodSpecification(
             ),
             model=InfNerfModelConfig(
                 tree_config = OctreeNodeConfig(
-                    max_depth=4, # 4
+                    max_depth=4,
                 ),
                 eval_num_rays_per_chunk=(1<<10)*GPU_scale,
             ),
@@ -78,7 +78,7 @@ InfNerf=MethodSpecification(
                 }
         },
         viewer=ViewerConfig(
-            num_rays_per_chunk=1 << 15, # 1 << 15
+            num_rays_per_chunk=1 << 15,
             max_num_display_images=1),
         vis=
         "viewer+tensorboard",
