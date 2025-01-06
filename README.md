@@ -59,6 +59,30 @@ After downloading all the raw images, use COLMAP to obtain the camera poses:
 ns-process-data images --data ./data/building-pixsfm/data/images --output-dir ./data/building-pixsfm/data --sfm-tool colmap --skip-image-processing --gpu
 ```
 
+<br>
+
+We have provided the COLMAP results for the Residence dataset: [Google Drive](https://drive.google.com/file/d/1X8EZRSwOopLWPQXjUCDczpaV0TW9ErHw/view?usp=sharing). The data structure for InfNeRF training would be like:
+
+```
+- Residence
+  - sparse
+    - 0
+      - cameras.bin
+      - images.bin
+      - points3D.bin
+      - project.ini
+  - images
+    - A
+      - DJI_0413.JPG
+      ...
+    - B
+      - DJI_0001.JPG
+      ...
+    - C
+      - DJI_0001.JPG
+      ...
+```
+
 ## Install
 
 Refer to the nerfstudio environment installation: [Installation](https://docs.nerf.studio/quickstart/installation.html).
@@ -74,7 +98,7 @@ pip install -e .
 Training command:
 
 ```
-ns-train inf-nerf --data ./data/building-pixsfm/data/images
+ns-train inf-nerf --data ./Residence
 ```
 
 ## Citation
