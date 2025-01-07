@@ -101,6 +101,12 @@ Training command:
 ns-train inf-nerf --data ./Residence
 ```
 
+You can use tensorboard to see the visualization of the evaluation results and metrics:
+```
+tensorboard --logdir=./outputs/Residence/inf-nerf/2025-01-06_143012 --port=6010
+```
+<img src="./img/tensorboard.png" width="700">
+
 ## Citation
 
 If you find this project useful, please consider citing:
