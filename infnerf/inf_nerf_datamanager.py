@@ -12,9 +12,10 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from nerfstudio.data.datamanagers import base_datamanager
 # from nerfstudio.data.datamanagers import variable_res_datamanager# import VariableResDataManagerConfig, VariableResDataManager
 from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes, TrainingCallbackLocation
-from infnerf.datasetmerger import DatasetMerger
+from infnerf.rescalable_dataset import RescalableDataset, DatasetMerger, CustomInputDataset
+from infnerf.inf_nerf_pixelsampler import InfNerfPixelSampler
 
-from nerfstudio.data.datasets.base_dataset import InputDataset
+
 
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Tuple, List
@@ -57,6 +58,9 @@ class MixMultiResDataManager(base_datamanager.VanillaDataManager):  # pylint: di
     config:MixMultiResDataManagerConfig
     train_dataset:DatasetMerger
     eval_dataset:DatasetMerger
+    pt_scale_list: Optional[list] = None
+    norm_xyz_list: Optional[list] = None
+
     def __init__(
         self,
         config: MixMultiResDataManagerConfig,
@@ -70,10 +74,11 @@ class MixMultiResDataManager(base_datamanager.VanillaDataManager):  # pylint: di
 
         for scale in self.config.train_scale:
             scale_factor=scale
-            datasets.append(InputDataset(
+            datasets.append(CustomInputDataset(
                     dataparser_outputs=self.train_dataparser_outputs,
                     scale_factor=scale_factor,
                 ))
+        
         self.config.collate_fn = base_datamanager.variable_res_collate
         """Sets up the data loaders for training"""
         return DatasetMerger(datasets)
@@ -83,7 +88,7 @@ class MixMultiResDataManager(base_datamanager.VanillaDataManager):  # pylint: di
         parser_output=self.dataparser.get_dataparser_outputs(split=self.test_split)
         for scale in self.config.eval_scale:
             scale_factor=scale
-            datasets.append(InputDataset(
+            datasets.append(CustomInputDataset(
                     dataparser_outputs=parser_output,
                     scale_factor=scale_factor,
                 ))

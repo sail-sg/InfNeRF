@@ -69,14 +69,14 @@ class InfNerfDataParserConfig(DataParserConfig):
 
     images_path: Path = Path("images")
     """Path to images directory relative to the data path."""
-    masks_path: Optional[Path] = None#Path("mask") # Path("mask")
-    eval_masks_path: Optional[Path] = None#Path("eval_mask") # Path("eval_mask")
+    masks_path: Optional[Path] = Path("mask") # Path("mask")
+    eval_masks_path: Optional[Path] = Path("eval_mask") # Path("eval_mask")
     """Path to masks directory. If not set, masks are not loaded."""
     depths_path: Optional[Path] = None
     """Path to depth maps directory. If not set, depths are not loaded."""
     colmap_path: Path = Path("sparse/0")
     """Path to the colmap reconstruction directory relative to the data path."""
-    eval_mode: Literal["fraction", "filename", "interval", "all"] = "all"
+    eval_mode: Literal["fraction", "filename", "interval", "all"] = "filename"
     '''Use filename to split train, val and test'''
 
     largest_downscale: Optional[int] = None
@@ -469,13 +469,14 @@ class InfNerfDataParser(DataParser):
         
     #get a translate + scale to move aabb into [-1,1]^3 
     def get_ts(self,aabb):
-        cube_box_halfsize=np.max((aabb[1,:]-aabb[0,:])/2)
-        ori=aabb[0,:]+cube_box_halfsize
-        translate=np.eye(4)
-        translate[:3,3]=-ori
-        scale=np.eye(4)
-        scale[:3,:3]*=1/cube_box_halfsize
-        return translate,scale
+        cube_box_halfsize = np.max((aabb[1, :] - aabb[0, :]) / 2)
+        ori = aabb[0, :] + (aabb[1, :] - aabb[0, :]) / 2
+        translate = np.eye(4)
+        translate[:3, 3] = -ori
+        scale = np.eye(4)
+        scale[:3, :3] *= 1 / cube_box_halfsize
+        return translate, scale
+    
     def get_pt_scale(self, points3D,poses,fx,meta):
         #obs's image id
         obs_i=[iid for _,data in points3D.items() for iid in data.image_ids]

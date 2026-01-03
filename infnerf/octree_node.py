@@ -13,10 +13,8 @@ from nerfstudio.field_components.field_heads import (
     # UncertaintyFieldHead,
 )
 # from nerfstudio.fields.nerfacto_field import TCNNNerfactoField
-from nerfstudio.data.scene_box import SceneBox
 from infnerf.inf_nerf_field import InfNerfField
 from nerfstudio.fields.base_field import Field
-from nerfstudio.fields.density_fields import HashMLPDensityField
 from nerfstudio.field_components.embedding import Embedding
 from typing import Dict, List, Tuple, Optional, Literal
 from nerfstudio.configs.base_config import PrintableConfig
@@ -28,10 +26,8 @@ import numpy as np
 class OctreeNodeConfig(PrintableConfig):
     """max depth of the octree."""
     max_depth: int = 10
-    min_sparse_pt: int = 0 
-    """when sparse pt less than this value, stop build tree """
-    root_take_bg: bool = True 
-    """root use scene contraction to take bg sample outside aabb"""
+    min_sparse_pt: int = 0 # 0
+    root_take_bg: bool = True #root use scene contraction to take bg sample outside aabb
     #field
     hidden_dim: int = 64
     hidden_dim_color:int = 64
@@ -49,12 +45,7 @@ class OctreeNodeConfig(PrintableConfig):
     device: str = 'cpu'
     implementation: Literal["tcnn", "torch"] = "tcnn"
     geo_feat_dim: int = 15
-    proposal_net_args_list: List[Dict] = field(
-        default_factory=lambda: [
-            {"hidden_dim": 16, "log2_hashmap_size": 17, "num_levels": 5, "max_res": 128, "use_linear": False},
-            {"hidden_dim": 16, "log2_hashmap_size": 17, "num_levels": 5, "max_res": 256, "use_linear": False},
-        ]
-    )
+    
 
 class OctreeNode(Field):
     def __init__(
@@ -67,32 +58,17 @@ class OctreeNode(Field):
         id: str = None,
     )->None:
         super().__init__()
+        # from .temporal_grid import test; test() # DEBUG
         self.config=config
-        self.register_buffer("aabb",aabb) # [2,3] [min/max,xyz]
-        self.register_buffer("depth",torch.Tensor([depth]).to(torch.int32))
-        self.register_buffer("gsd",torch.max(self.aabb[1,:]-self.aabb[0,:])/(self.config.max_res*self.config.res_upsample_factor)) # physical size per voxel
-        self.register_buffer("RGB_id",torch.rand(3)) # node's color, for tree rendering
-        self.id=id 
+        self.register_buffer("aabb",aabb)#[2,3] [min/max,xyz] node 的物理体积（比如：父节点的物理体积很大，子节点的物理体积小）
+        self.register_buffer("depth",torch.Tensor([depth]).to(torch.int32))# = torch.Parameter(depth,requires_grad=False)
+        self.register_buffer("gsd",torch.max(self.aabb[1,:]-self.aabb[0,:])/(self.config.max_res*self.config.res_upsample_factor)) # 指每个 voxel 的大小，指每个 node 里的 voxel 的物理体积
+        self.register_buffer("RGB_id",torch.rand(3))
+        self.id=id # 每个 box 有对应的 id，方便看独立的 box 的渲染效果
         if (not self.config.root_take_bg) or self.depth.item()==0:#root take bg, so it need scene contraction
-            scene_contraction = SceneContraction(order=float("inf"))
+            scene_constraction = SceneContraction(order=float("inf"))
         else:
-            scene_contraction = None
-            
-        # Build the proposal network(s)
-        #self.density_fns = []
-        num_prop_nets = len(self.config.proposal_net_args_list)
-        self.proposal_networks = torch.nn.ModuleList()
-        for i in range(num_prop_nets):
-            prop_net_args = self.config.proposal_net_args_list[min(i, len(self.config.proposal_net_args_list) - 1)]
-            network = HashMLPDensityField(
-                aabb,
-                spatial_distortion=scene_contraction,
-                **prop_net_args,
-                implementation=self.config.implementation,
-            )
-            self.proposal_networks.append(network)
-        #self.density_fns.extend([network.density_fn for network in self.proposal_networks])
-            
+            scene_constraction = None
         self.field=InfNerfField(
             self.aabb,
             hidden_dim=config.hidden_dim,
@@ -100,7 +76,7 @@ class OctreeNode(Field):
             max_res=config.max_res,#2048
             log2_hashmap_size=config.log2_hashmap_size,
             hidden_dim_color=config.hidden_dim_color,
-            spatial_distortion=scene_contraction,
+            spatial_distortion=scene_constraction,
             num_images=num_photo,
         )
         self.samples=None
@@ -110,7 +86,11 @@ class OctreeNode(Field):
             levels=4,
             implementation=self.config.implementation,
         )
+
         
+        #import pdb; pdb.set_trace()
+
+        # 构建八叉树，目前构建的完全八叉树，不是稀疏的（后续要优化）
         if self.depth.item()<config.max_depth-1:#recusively build
             mask,children_mask=self.mask_pt_build(sparse_pt[...,:3],sparse_pt[...,-1:]) # 4 dimension: x, y, z, r (r means 由 pixel 放射出的锥体的 r 的大小)
 
@@ -130,6 +110,8 @@ class OctreeNode(Field):
                     else:
                         self.tree_children.append(None)
 
+    def to(self, *args, **kwargs):
+        super().to(*args,**kwargs)
     def get_self_params(self):
         return list(self.field.parameters())
     def get_tree_params(self):
@@ -138,12 +120,14 @@ class OctreeNode(Field):
             if child is not None:
                 ret.extend(child.get_tree_params())
         return ret
-    
-    # """the splitting point of the children"""
+    def tree_requires_grad_(self, requires_grad: bool):
+        self.field.requires_grad_(requires_grad)
+        for child in self.tree_children:
+            if child is not None:
+                child.tree_requires_grad_(requires_grad)
+
     def cutting_pt(self)->Tensor:
         return torch.mean(self.aabb,0)
-    
-    # """get the bounding box of the i-th child"""
     def idx2childbox(self, idx: int)->Tensor:
         cutting_pt=self.cutting_pt()
         ret=self.aabb.clone()
@@ -153,10 +137,8 @@ class OctreeNode(Field):
             else:
                 ret[0,i]=cutting_pt[i] #min=cut pt
         return ret
-    
     def is_leaf(self)->bool:
         return len(self.tree_children)==0
-    
     def print_tree(self):
         print("\t"*self.depth.item()+f"{self.id}: [{self.aabb[0,0]},{self.aabb[1,0]}]*[{self.aabb[0,1]},{self.aabb[1,1]}]*[{self.aabb[0,2]},{self.aabb[1,2]}], gsd:{self.gsd} {self.aabb.device}")
         for child in self.tree_children:
@@ -164,15 +146,12 @@ class OctreeNode(Field):
                 print("\t"*(self.depth.item()+1)+"None")
             else:
                 child.print_tree()
-
-    #recursively get the depth of the tree            
     def get_tree_depth(self)->int:
         max_depth=self.depth
         for child in self.tree_children:
             if child is not None:
                 max_depth=max(child.get_tree_depth(),max_depth)
         return max_depth
-    
     def count_tree_node(self)->int:
         num=1
         for child in self.tree_children:
@@ -196,48 +175,44 @@ class OctreeNode(Field):
         for child in self.tree_children:
             if child is not None:
                 child.save_subtree_aabb(only_leaves)
-
-    #split pt in R^3 into 8 tensor
+    #cut pt into 8 tensor
     def cut_pt(self,pt:Tensor)->List:
         ret=[]
         masks=self.cut(pt)
         for i in range(8):
             ret.append(pt[masks[i]])
         return ret
-    
-    # create a mask for splitting pt into 8 children along the cutting point
+
     def cut(self,pt:Tensor)-> List[Tensor]:#[N,3]->[8][N]
         cutting_pt=self.cutting_pt().to(pt.device)
-        split=pt<cutting_pt # b 3 in boolean, like [True,True,False]
+        split=pt<cutting_pt
         ret=[]
-        for i in range(8): # 8 children
-            mask=torch.tensor(np.array(list(np.binary_repr(i,3)))=='0').to(pt.device) # like 0->[F,F,F] 6->[T,T,F]
-            ret.append(torch.all(split==mask,-1)) # b
+        # 每个父节点有 1 个 mask，对应 8 个子节点，所有子节点们共有 8 个 mask
+        for i in range(8):
+            mask=torch.tensor(np.array(list(np.binary_repr(i,3)))=='0').to(pt.device) #like [True,True,False]
+            ret.append(torch.all(split==mask,-1)) # does pt inside current grid
         return ret
-    
-    # distribute the sparse points to self or 8 children. only call when build tree
+
     def mask_pt_build(self,
                 pt:Tensor,#[N,3]
                 scale:Tensor,#[N,1]
                 )-> Tuple[Tensor, List[Tensor]]:#[N],[8][N]
-        self_mask=self.self_mask(pt, scale.squeeze(-1)).to(pt.device)
+        self_mask=self.self_mask(pt, scale.squeeze(-1)).to(pt.device) # 当前节点对应的 mask # self.config.device
         children_mask=self.cut(pt) # [8, N] type bool, represent whether pt inside current children grid
         for i in range(len(children_mask)):
             children_mask[i]=torch.logical_and(children_mask[i],torch.logical_not(self_mask))
         return self_mask, children_mask
-    
-    # pick the sample for this node (not for children)
+    #mask the sample for this node (not including children)
     # all sample bigger then gsd should be rendered by self, otherwise rendered by child
     def self_mask(self,
                   pt: Tensor, #[N,3] 
                   scale:Tensor,#[N]
                   )->Tensor:#[N],bool
-        if self.config.root_take_bg and self.depth==0: # root take bg
+        if self.config.root_take_bg and self.depth==0:
             bg=torch.logical_or(torch.any(pt>self.aabb[1],-1),torch.any(pt<self.aabb[0],-1))
-            return torch.logical_or(scale>self.gsd,bg) 
-        return scale>self.gsd
+            return torch.logical_or(scale>=self.gsd,bg) # root take bg # /2
+        return scale>=self.gsd # /2
     
-    # distribute the sample points to self or 8 children. different from mask_pt_build, only call when rendering
     def mask_pt(self,
                 pt:Tensor,#[N,3]
                 scale:Tensor,#[N,1]
@@ -245,10 +220,11 @@ class OctreeNode(Field):
                 )-> Tuple[Tensor, List[Tensor]]:#[N],[8][N]
         if len(self.tree_children)==0:#at the leaf, take it all
             return idx, []
+        #import pdb;pdb.set_trace()
         pt = pt.reshape(-1, 3)
         scale = scale.reshape(-1)
         self_mask=self.self_mask(pt[idx],scale[idx])#n_idx->bool
-        #if self.depth==2: #debug render by given depth
+        #if self.depth==2:
         #    self_mask=torch.ones_like(self_mask)
         #else:
         #    self_mask=torch.zeros_like(self_mask)
@@ -269,10 +245,13 @@ class OctreeNode(Field):
     def mask_samples(self, ray_samples, idx) -> Tuple[Tensor, List[Tensor]]:        
         frustums=ray_samples.frustums
         radius = torch.sqrt(frustums.pixel_area)/1.7724
+        #pertubation
+        #import pdb;pdb.set_trace()
         if False:
             scale=(frustums.starts+frustums.ends)/2*radius#*2**((torch.rand_like(radius))*0.00) #[N,1]
         else:
             scale=(frustums.starts+frustums.ends)/2*radius*2**(torch.rand_like(radius)-0.5) #[N,1]
+
         self_mask, children_mask = self.mask_pt(frustums.get_positions(), scale, idx)
         # Parent should take care of the None child. 
         # None child means no info, no need to subdivide, doesn't mean physically empty.
@@ -286,6 +265,16 @@ class OctreeNode(Field):
 
     def empty_outputs(self, shape, device) -> Dict[FieldHeadNames, Tensor]:
         outputs ={}
+        # if self.config.use_transient_embedding:
+        #     outputs[FieldHeadNames.UNCERTAINTY] = torch.zeros(*shape, self.field.field_head_transient_uncertainty.out_dim, device=device)#1
+        #     outputs[FieldHeadNames.TRANSIENT_RGB] = torch.zeros(*shape, self.field.field_head_transient_rgb.out_dim, device=device)
+        #     #   self.field_head_transient_rgb(x)
+        #     outputs[FieldHeadNames.TRANSIENT_DENSITY] = torch.zeros(*shape, self.field.field_head_transient_density.out_dim, device=device)
+        #     #   self.field_head_transient_density(x)
+        # #if self.config.use_sematics:
+            
+        # if self.config.predict_normals:
+        #     outputs[FieldHeadNames.PRED_NORMALS]=torch.zeros(*shape, self.field_head_pred_normals.out_dim, device=device)
         if self.config.render_tree:
             outputs[FieldHeadNames.SEMANTICS] = self.RGB_id.repeat(*shape,1).to(device)
         outputs[FieldHeadNames.RGB] =torch.zeros(*shape,3, device=device)
@@ -306,11 +295,13 @@ class OctreeNode(Field):
             self_samples=ray_samples[self_idx]
             density, density_embedding=self.field.get_density(self_samples)
             self_output = self.field.get_outputs(self_samples, density_embedding, embedded_appearance[self_idx,:])
+
             for head in self_output:
                 outputs[head][self_idx] = self_output[head]
             outputs[FieldHeadNames.SEMANTICS][self_idx] = 0.8 * self.RGB_id.repeat(*self_samples.shape,1) + 0.2 * self_output[FieldHeadNames.RGB]
             outputs[FieldHeadNames.DENSITY][self_idx] = density
             outputs["level"][self_idx]=self.depth
+            # outputs[density_embedding][self_idx]=density_embedding
         for i in range(len(self.tree_children)):
             child_idx = children_idx[i]
             if child_idx.numel()==0 or self.tree_children[i] is None:
@@ -319,25 +310,27 @@ class OctreeNode(Field):
                 self.tree_children[i].get_outputs(ray_samples, embedded_appearance, child_idx, outputs)
         return
     
-    def get_density(self, ray_samples:RaySamples, all_density:Optional[Tensor], all_feat:Optional[Tensor], idx:Optional[Tensor], detail_level: Optional[int]):
+    
+
+    def get_density(self, ray_samples:RaySamples, all_density:Optional[Tensor], all_feat:Optional[Tensor], idx:Optional[Tensor]):
+        device = ray_samples.frustums.directions.device
         self_idx, children_idx = self.mask_samples(ray_samples, idx)
-        if detail_level is None or detail_level>=len(self.proposal_networks):
-            density_fn=self.field.get_density
-        else:
-            density_fn=self.proposal_networks[detail_level].get_density
         if not self_idx.shape[0]==0:
             self_sample = ray_samples[self_idx]
             if all_feat is not None:
-                all_density[self_idx], all_feat[self_idx] = density_fn(self_sample)
+                all_density[self_idx], all_feat[self_idx] = self.field.get_density(self_sample)
             else:
-                all_density[self_idx], _ = density_fn(self_sample)
+                all_density[self_idx], _ = self.field.get_density(self_sample)
 
         for i in range(len(self.tree_children)):#0 or 8
             child_idx = children_idx[i]
             if child_idx.numel()==0 or self.tree_children[i] is None:
                 continue
+                all_density[child_idx] = 0#torch.zeros_like(all_density[child_idx]).to(device)
+                if all_feat is not None:
+                    all_feat[child_idx] = 0#torch.zeros(*all_density[child_idx].shape[:-1], self.field.geo_feat_dim, dtype=torch.float16).to(device)
             else:
-                self.tree_children[i].get_density(ray_samples, all_density, all_feat, child_idx, detail_level)
+                self.tree_children[i].get_density(ray_samples, all_density, all_feat, child_idx)
         return
 
     def get_interlevel_loss(self, num_interlvl_sample, device):
@@ -373,11 +366,6 @@ class OctreeNode(Field):
             rand_sample=self.aabb[0,:]+torch.rand(num_interlvl_sample,3, device = device)*(self.aabb[1,:]-self.aabb[0,:])
         else:
             rand_sample=self.aabb.mean()+torch.randn(num_interlvl_sample,3, device = device)*(self.aabb[1,:]-self.aabb[0,:])
-        density=[]
-        field_density,_= self.field.get_density2(rand_sample)
-        density.append(field_density)
-        for i in range(len(self.proposal_networks)):
-            density.append(self.proposal_networks[i].density_fn(rand_sample[:int(num_interlvl_sample/4),:]))
-        density=torch.cat(density)
+        density,_= self.field.get_density2(rand_sample)
         transparency=(-density).exp()
         return l1_loss(transparency, torch.ones_like(transparency, device=transparency.device))
